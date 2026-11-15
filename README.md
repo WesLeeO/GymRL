@@ -72,7 +72,7 @@ Q(s_t,a_t) \leftarrow Q(s_t,a_t) + \alpha\big[r_t + \gamma(1-d_t)\max_{a} Q(s_{t
 **DQN** — a network $Q_\theta$ trained on batches from a replay buffer $\mathcal{D}$, against a frozen copy $Q_{\theta^-}$ that is copied over every $C$ steps:
 
 ```math
-\mathcal{L}(\theta) = \mathbb{E}_{\mathcal{D}}\Big[\text{Huber}\big(r_t + \gamma(1-d_t)\max_{a} Q_{\theta^-}(s_{t+1},a) - Q_\theta(s_t,a_t)\big)\Big]
+\mathcal{L}(\theta) = \mathbb{E}_{(s_t,a_t,r_t,s_{t+1},d_t)\sim\mathcal{D}}\Big[\text{Huber}\big(r_t + \gamma(1-d_t)\max_{a} Q_{\theta^-}(s_{t+1},a) - Q_\theta(s_t,a_t)\big)\Big]
 \qquad
 \theta^- \leftarrow \theta \ \text{ every } C \text{ steps}
 ```
@@ -106,9 +106,9 @@ Actor (clipped) and critic (regression to $R_t$), trained together with an entro
 **DDPG** — for continuous actions: an actor $\mu_\phi(s)$ outputs the action, a critic $Q_\theta$ scores it, both trained on batches from $\mathcal{D}$, with target copies $Q_{\theta^-}$ and $\mu_{\phi^-}$:
 
 ```math
-\mathcal{L}(\theta) = \mathbb{E}_{\mathcal{D}}\Big[\big(Q_\theta(s_t,a_t) - r_t - \gamma(1-d_t) Q_{\theta^-}(s_{t+1}, \mu_{\phi^-}(s_{t+1}))\big)^2\Big]
+\mathcal{L}(\theta) = \mathbb{E}_{(s_t,a_t,r_t,s_{t+1},d_t)\sim\mathcal{D}}\Big[\big(Q_\theta(s_t,a_t) - r_t - \gamma(1-d_t) Q_{\theta^-}(s_{t+1}, \mu_{\phi^-}(s_{t+1}))\big)^2\Big]
 \qquad
-\mathcal{L}(\phi) = - \mathbb{E}_{\mathcal{D}}\big[Q_\theta(s_t, \mu_\phi(s_t))\big]
+\mathcal{L}(\phi) = - \mathbb{E}_{s_t\sim\mathcal{D}}\big[Q_\theta(s_t, \mu_\phi(s_t))\big]
 ```
 
 The target networks follow slowly after every step (soft update, $\tau = 0.005$):
