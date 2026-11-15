@@ -61,63 +61,63 @@ uv run python 03_ppo/train.py --env acrobot --live --snapshots 5
 
 ## Algorithms
 
-$d = 1$ when the episode ends for real (not a time limit), $\gamma = 0.99$.
+$s_t, a_t, r_t$ are the state, action and reward at step $t$; $d_t = 1$ when the episode ends for real (not a time limit); $\gamma = 0.99$.
 
 **Tabular Q-learning** — a table of values, nudged toward the TD target:
 
-$$
-Q(s,a) \leftarrow Q(s,a) + \alpha\big[r + \gamma(1-d)\max_{a'} Q(s',a') - Q(s,a)\big]
-$$
+```math
+Q(s_t,a_t) \leftarrow Q(s_t,a_t) + \alpha\big[r_t + \gamma(1-d_t)\max_{a} Q(s_{t+1},a) - Q(s_t,a_t)\big]
+```
 
 **DQN** — a network $Q_\theta$ trained on batches from a replay buffer $\mathcal{D}$, against a frozen copy $Q_{\theta^-}$ that is copied over every $C$ steps:
 
-$$
-\mathcal{L}(\theta) = \mathbb{E}_{(s,a,r,s',d)\sim\mathcal{D}}\Big[\text{Huber}\big(r + \gamma(1-d)\max_{a'} Q_{\theta^-}(s',a') - Q_\theta(s,a)\big)\Big]
+```math
+\mathcal{L}(\theta) = \mathbb{E}_{\mathcal{D}}\Big[\text{Huber}\big(r_t + \gamma(1-d_t)\max_{a} Q_{\theta^-}(s_{t+1},a) - Q_\theta(s_t,a_t)\big)\Big]
 \qquad
 \theta^- \leftarrow \theta \ \text{ every } C \text{ steps}
-$$
+```
 
 **PPO** — an actor $\pi_\theta$ picks actions, a critic $V_\phi$ predicts the return. All averages are over the collected batch.
 
-The critic's surprise at each step gives the advantage (GAE, computed backwards):
+The critic's surprise at each step gives the advantage $A_t$ (GAE, computed backwards) and the return target $R_t$:
 
-$$
-\delta_t = r_t + \gamma(1-d_{t+1})\,V_\phi(s_{t+1}) - V_\phi(s_t)
+```math
+\delta_t = r_t + \gamma(1-d_{t+1}) V_\phi(s_{t+1}) - V_\phi(s_t)
 \qquad
-\hat A_t = \delta_t + \gamma\lambda(1-d_{t+1})\,\hat A_{t+1}
+A_t = \delta_t + \gamma\lambda(1-d_{t+1}) A_{t+1}
 \qquad
-\hat R_t = \hat A_t + V_\phi(s_t)
-$$
+R_t = A_t + V_\phi(s_t)
+```
 
-Actor (clipped) and critic (regression to $\hat R_t$), trained together with an entropy bonus $\mathcal{H}$ that keeps it exploring:
+Actor (clipped) and critic (regression to $R_t$), trained together with an entropy bonus $\mathcal{H}$ that keeps it exploring:
 
-$$
+```math
 \rho_t = \frac{\pi_\theta(a_t\mid s_t)}{\pi_{\text{old}}(a_t\mid s_t)}
 \qquad
-\mathcal{L}_{\text{actor}}(\theta) = -\,\mathbb{E}_t\Big[\min\big(\rho_t\hat A_t,\ \text{clip}(\rho_t, 1-\epsilon, 1+\epsilon)\hat A_t\big)\Big]
-$$
+\mathcal{L}_{\text{actor}}(\theta) = - \mathbb{E}_t\Big[\min\big(\rho_t A_t,\ \text{clip}(\rho_t, 1-\epsilon, 1+\epsilon) A_t\big)\Big]
+```
 
-$$
-\mathcal{L}_{\text{critic}}(\phi) = \mathbb{E}_t\Big[\big(V_\phi(s_t) - \hat R_t\big)^2\Big]
+```math
+\mathcal{L}_{\text{critic}}(\phi) = \mathbb{E}_t\Big[\big(V_\phi(s_t) - R_t\big)^2\Big]
 \qquad
-\mathcal{L} = \mathcal{L}_{\text{actor}} + c_1\,\mathcal{L}_{\text{critic}} - c_2\,\mathbb{E}_t\big[\mathcal{H}[\pi_\theta(\cdot\mid s_t)]\big]
-$$
+\mathcal{L} = \mathcal{L}_{\text{actor}} + c_1 \mathcal{L}_{\text{critic}} - c_2 \mathbb{E}_t\big[\mathcal{H}[\pi_\theta(\cdot\mid s_t)]\big]
+```
 
-**DDPG** — for continuous actions: an actor $\mu_\phi(s)$ outputs the action, a critic $Q_\theta$ scores it, both trained on batches from $\mathcal{D}$:
+**DDPG** — for continuous actions: an actor $\mu_\phi(s)$ outputs the action, a critic $Q_\theta$ scores it, both trained on batches from $\mathcal{D}$, with target copies $Q_{\theta^-}$ and $\mu_{\phi^-}$:
 
-$$
-\mathcal{L}(\theta) = \mathbb{E}_{\mathcal{D}}\Big[\big(Q_\theta(s,a) - r - \gamma(1-d)\,Q_{\theta'}(s', \mu_{\phi'}(s'))\big)^2\Big]
+```math
+\mathcal{L}(\theta) = \mathbb{E}_{\mathcal{D}}\Big[\big(Q_\theta(s_t,a_t) - r_t - \gamma(1-d_t) Q_{\theta^-}(s_{t+1}, \mu_{\phi^-}(s_{t+1}))\big)^2\Big]
 \qquad
-\mathcal{L}(\phi) = -\,\mathbb{E}_{s\sim\mathcal{D}}\big[Q_\theta(s, \mu_\phi(s))\big]
-$$
+\mathcal{L}(\phi) = - \mathbb{E}_{\mathcal{D}}\big[Q_\theta(s_t, \mu_\phi(s_t))\big]
+```
 
 The target networks follow slowly after every step (soft update, $\tau = 0.005$):
 
-$$
-\theta' \leftarrow \tau\,\theta + (1-\tau)\,\theta'
+```math
+\theta^- \leftarrow \tau \theta + (1-\tau) \theta^-
 \qquad
-\phi' \leftarrow \tau\,\phi + (1-\tau)\,\phi'
-$$
+\phi^- \leftarrow \tau \phi + (1-\tau) \phi^-
+```
 
 ## Layout
 
